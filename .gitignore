@@ -11,6 +11,9 @@ ENV/
 # Pycharm Project
 .idea/
 
+# Docs Build
+docs/build
+
 # Data Folder
 data/*
 !data/.gitkeep

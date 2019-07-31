@@ -5,27 +5,30 @@ class SkeletonModel(torch.nn.Module):
     """Definition of the project model.
 
     Defines the architecture of the neural network used in the project as a child class of `torch.nn.Module`.
-    """
-    param: int
 
-    def __init__(self, param: int):
-        """Constructor of the neural network.
+    Attributes:
+        layer (torch.nn.Linear): main (and only) linear layer of the model.
+    """
+    layer: torch.nn.Linear
+
+    def __init__(self, use_bias: bool):
+        """Constructor of the model class.
+
+        Initializes the layers required to define propagate through the model.
 
         Args:
-            param (int): hyperparameter required by the layers of the neural network.
+            use_bias (bool): whether or not to train a bias in `self.layer`.
         """
         super(SkeletonModel, self).__init__()
-        self.param = param
+        self.layer = torch.nn.Linear(1, 1, bias=use_bias)
 
-    def forward(self, input_data):
+    def forward(self, input_data: torch.Tensor):
         """Performs a forward pass through the neural network.
-
-        Performs a forward pass throught the entire model used in the project.
 
         Args:
             input_data (torch.Tensor): input of the neural network.
 
         Returns:
-            torch.Tensor: Output obtained after propagating the input through the neural network.
+            output_data (torch.Tensor): output obtained after propagating the input through the neural network.
         """
-        pass
+        return self.layer(input_data.unsqueeze(1)).squeeze(1)

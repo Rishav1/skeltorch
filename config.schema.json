@@ -1,0 +1,109 @@
+{
+    "type": "object",
+    "properties": {
+        "data": {
+            "type": "object",
+            "properties": {
+                "generate_with_bias": {
+                    "type": "boolean"
+                },
+                "total_samples": {
+                    "type": "number",
+                    "minimum": 1
+                }
+            },
+            "required": [
+                "generate_with_bias",
+                "total_samples"
+            ]
+        },
+        "split": {
+            "type": "object",
+            "properties": {
+                "validation_percentage": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                },
+                "test_percentage": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                }
+            },
+            "required": [
+                "validation_percentage",
+                "test_percentage"
+            ]
+        },
+        "model": {
+            "type": "object",
+            "properties": {
+                "use_bias": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "use_bias"
+            ]
+        },
+        "training": {
+            "type": "object",
+            "properties": {
+                "max_epochs": {
+                    "type": "number",
+                    "minimum": 1
+                },
+                "batch_size": {
+                    "type": "number",
+                    "minimum": 1
+                },
+                "lr": {
+                    "type": "number",
+                    "minimum": 0
+                },
+                "lr_decay_strategy": {
+                    "type": "string",
+                    "enum": [
+                        "plateau"
+                    ]
+                },
+                "lr_decay_plateau_patience": {
+                    "type": "number",
+                    "minimum": 1
+                },
+                "lr_decay_plateau_factor": {
+                    "type": "number",
+                    "minimum": 1
+                },
+                "early_stopping_strategy": {
+                    "type": "string",
+                    "enum": [
+                        "no_reduction"
+                    ]
+                },
+                "early_stopping_no_reduction_epochs": {
+                    "type": "number",
+                    "minimum": 1
+                },
+                "early_stopping_no_reduction_tolerance": {
+                    "type": "number",
+                    "minimum": 1
+                }
+            },
+            "required": [
+                "max_epochs",
+                "batch_size",
+                "lr",
+                "lr_decay_strategy",
+                "early_stopping_strategy"
+            ]
+        }
+    },
+    "required": [
+        "data",
+        "split",
+        "model",
+        "training"
+    ]
+}

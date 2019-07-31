@@ -11,33 +11,34 @@ from pytorch_skeleton.utils import SkeletonUtils
 # Create the main parser and add global parameters to it
 parser = argparse.ArgumentParser(description='Run Skeleton')
 parser.add_argument('--exp-name', required=True, help='Name of the experiment')
-parser.add_argument('--data-folder-path', type=str, default='data', help='Folder to store data')
 parser.add_argument('--cuda', action='store_true', help='Whether you want to run in GPU')
-parser.add_argument('--cuda-device', default=0, type=int, help='GPU device to run into')
+parser.add_argument('--cuda-device', default=0, type=int, help='GPU device to run into. Starting from index 0.')
 parser.add_argument('--seed', type=int, default=0, help='Seed for the generation of random values')
 parser.add_argument('--verbose', action='store_true', help='Whether to output the log using the standard output')
+parser.add_argument('--exp-folder-path', help='Basepath to store/load the experiment from')
+parser.add_argument('--data-folder-path', help='Basepath to store/load the data from')
 
 # Create subparsers for the different commands
-subparsers = parser.add_subparsers(dest='command')
+subparsers = parser.add_subparsers(dest='command', required=True)
 subparsers_init = subparsers.add_parser(name='init')
 subparsers_train = subparsers.add_parser(name='train')
 subparsers_test = subparsers.add_parser(name='test')
 
 # Add parameters to the subparsers
-subparsers_init.add_argument('--config-file-path', type=str, default='config.json', help='Path to the config.json file')
-subparsers_init.add_argument('--config-schema-file-path', type=str, default='config.schema.json',
-                             help='Path to the config.schema.json file')
+subparsers_init.add_argument('--config-file-path', type=str, help='Path to the config file')
+subparsers_init.add_argument('--config-schema-path', type=str, help='Path to the schema file used to validate the '
+                                                                    'configuration')
 
-# Parse the Arguments
-args = parser.parse_args()
+# Create the Logger object for the execution
+logger = SkeletonUtils.get_logger()
 
 # Create the Execution and Experiment object
-execution = SkeletonExecution(args)
-experiment = SkeletonExperiment(execution.exp_name)
+execution = SkeletonExecution(parser.parse_args(), logger)
+experiment = SkeletonExperiment(execution.exp_name, execution.paths['experiments'], logger)
 
-# Create a logger object for the execution
-logger = SkeletonUtils.get_logger(experiment.paths['experiment_log'],
-                                  execution.verbose) if execution.command != 'init' else None
+# Extend the Logger to fulfill execution arguments if the command is not init
+if execution.command and execution.command != 'init':
+    SkeletonUtils.extend_logger(logger, experiment.paths['experiment_log'], execution.verbose)
 
 # Initialize random seeds
 random.seed(execution.seed)
@@ -46,18 +47,15 @@ torch.manual_seed(execution.seed)
 torch.cuda.manual_seed_all(execution.seed)
 
 # Execute actions associated to the 'init' command
-if args.command == 'init':
-    experiment.create(execution.config_file_path, execution.config_schema_file_path)
-    logger.info('Experiment {} created successfully.'.format(experiment.exp_name))
+if execution.command == 'init':
+    experiment.create(execution.paths['config_file'], execution.paths['config_schema'])
 
 # Execute actions associated to the 'train' command
-elif args.command == 'train':
+elif execution.command == 'train':
     experiment.load()
-    logger.info('Experiment {} loaded successfully.'.format(experiment.exp_name))
     Skeleton(execution, experiment, logger).train()
 
 # Execute actions associated to the 'train' command
-elif args.command == 'test':
+elif execution.command == 'test':
     experiment.load()
-    logger.info('Experiment {} loaded successfully.'.format(experiment.exp_name))
     Skeleton(execution, experiment, logger).test()
