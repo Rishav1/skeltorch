@@ -4,7 +4,7 @@ import torch
 import logging
 
 
-class SkeletonExecution:
+class Execution:
     """Execution class handler.
 
     Class used to store and validate the arguments of the execution. Other objects must access execution arguments

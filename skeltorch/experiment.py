@@ -3,11 +3,12 @@ import os
 import re
 import torch
 import tensorboardX
-from pytorch_skeleton.configuration import SkeletonConfiguration
-from pytorch_skeleton.data import SkeletonData
+from skeltorch.configuration import Configuration
+from skeltorch.data import Data
+from skeltorch.execution import Execution
 
 
-class SkeletonExperiment:
+class Experiment:
     """Experiment class handler.
 
     Class used to validate the process of creating and loading an experiment. Also used to create a reference to
@@ -21,27 +22,29 @@ class SkeletonExperiment:
         tbx (tensorboardX.SummaryWriter): object to log data using TensorBoard.
         logger (logging.Logger): logger object.
     """
+    execution: Execution
     exp_name: str
     paths: dict = {}
-    conf: SkeletonConfiguration
-    data: SkeletonData
+    conf: Configuration
+    data: Data
     tbx: tensorboardX.SummaryWriter
     logger: logging.Logger
 
-    def __init__(self, exp_name: str, exp_folder_path: str, logger: logging.Logger):
+    def __init__(self, execution: Execution, conf: Configuration, data: Data, logger: logging.Logger):
         """Constructor of the experiment class.
 
         Args:
             exp_name (str): name of the experiment.
             logger (logging.Logger): logger object.
         """
-        self.exp_name = exp_name
+        self.execution = execution
+        self.exp_name = self.execution.exp_name
         self.logger = logger
-        self.conf = SkeletonConfiguration()
-        self.data = SkeletonData()
-        self._initialize_paths(exp_folder_path)
+        self.conf = conf
+        self.data = data
+        self._initialize_paths(self.execution.paths['experiments'])
 
-    def create(self, config_file_path: str, config_schema_file_path: str):
+    def create(self):
         """Creates a new experiment.
 
         The process of creating an experiment follows this steps:
@@ -49,13 +52,9 @@ class SkeletonExperiment:
             2. Create the folders associated to an experiment.
             3. Save both instances inside the experiment folder.
             4. Create an empty `verbose.log` inside the experiment folder.
-
-        Args:
-            config_file_path (str): path to the configuration file to be used in the experiment.
-            config_schema_file_path (str): path to the schema file to be used to validate the configuration file.
         """
-        self.conf.create(config_file_path, config_schema_file_path)
-        self.data.create(self.conf)
+        self.conf.create(self.execution.paths['config_file'], self.execution.paths['config_schema'])
+        self.data.create(self.execution.paths['data'])
         os.makedirs(self.paths['experiment'])
         os.makedirs(self.paths['experiment_tensorboard'])
         os.makedirs(self.paths['experiment_checkpoints'])

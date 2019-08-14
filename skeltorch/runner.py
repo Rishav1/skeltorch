@@ -4,43 +4,46 @@ import random
 import torch
 import torch.optim
 import torch.utils.data
-from pytorch_skeleton.execution import SkeletonExecution
-from pytorch_skeleton.experiment import SkeletonExperiment
-from pytorch_skeleton.dataset import SkeletonDataset
-from pytorch_skeleton.model import SkeletonModel
+from skeltorch import Execution, Experiment
 
 
-class Skeleton:
-    """
-
-    """
-    execution: SkeletonExecution
-    experiment: SkeletonExperiment
-    train_dataset: SkeletonDataset
-    validation_dataset: SkeletonDataset
-    test_dataset: SkeletonDataset
-    train_loader: torch.utils.data.DataLoader
-    validation_loader: torch.utils.data.DataLoader
-    test_loader: torch.utils.data.DataLoader
-    model: SkeletonModel
+class Runner:
+    execution: Execution
+    experiment: Experiment
+    datasets: dict
+    loaders: dict
+    model: torch.nn.Module
     optimizer: torch.optim.Optimizer
     lr_scheduler: torch.optim.lr_scheduler
     counters: dict
     losses: dict
     logger: logging.Logger
 
-    def __init__(self, execution: SkeletonExecution, experiment: SkeletonExperiment, logger: logging.Logger):
+    def __init__(self, execution: Execution, experiment: Experiment, logger: logging.Logger):
         self.execution = execution
         self.experiment = experiment
         self.logger = logger
-        self._init_datasets()
-        self._init_loaders()
-        self._init_model()
-        self._init_optimizer()
-        self._init_lr_scheduler()
-        self.counters = {'epoch': 0, 'train_it': 0, 'validation_it': 0}
+
+    def init(self):
+        self.datasets = self.experiment.data.get_datasets()
+        self.loaders = self.experiment.data.get_loaders()
+        self.init_model()
+        self.init_optimizer()
+        self.init_lr_scheduler()
+        self.counters = {'epoch': 1, 'train_it': 1, 'validation_it': 1}
         self.losses = {'train': {}, 'validation': {}, 'test': {}}
         self._load_checkpoint()
+
+    def init_model(self):
+        raise NotImplementedError
+
+    def init_optimizer(self):
+        raise NotImplementedError
+
+    def init_lr_scheduler(self):
+        self.lr_scheduler = None
+        if self.experiment.conf.get('training', 'lr_decay_strategy') == 'plateau':
+            self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=1)
 
     def train(self):
         """
@@ -49,30 +52,26 @@ class Skeleton:
 
         """
         for self.counters['epoch'] in \
-                range(self.counters['epoch'] + 1, self.experiment.conf.get('training', 'max_epochs') + 1):
-
+                range(self.counters['epoch'], self.experiment.conf.get('training', 'max_epochs') + 1):
             self.logger.info('Initiating Epoch {}'.format(self.counters['epoch']))
 
             e_train_losses = []
             e_validation_losses = []
 
             self.model.train()
-            for self.counters['train_it'], (it_data, it_target) in \
-                    enumerate(self.train_loader, self.counters['train_it'] + 1):
+            for it_data, it_target in self.train_loader:
                 self.optimizer.zero_grad()
-                it_prediction = self.model(it_data.float())
-                it_loss = torch.nn.functional.l1_loss(it_prediction, it_target.float())
+                it_loss = self._step_train(it_data, it_target)
                 it_loss.backward()
                 self.optimizer.step()
                 e_train_losses.append(it_loss.item())
+                self.counters['train_it'] += 1
 
             self.model.eval()
-            for self.counters['validation_it'], (it_data, it_target) in \
-                    enumerate(self.validation_loader, self.counters['validation_it'] + 1):
-                with torch.no_grad():
-                    it_prediction = self.model(it_data.float())
-                it_loss = torch.nn.functional.l1_loss(it_prediction, it_target.float())
+            for it_data, it_target in self.validation_loader:
+                it_loss = self._step_validation(it_data, it_target)
                 e_validation_losses.append(it_loss.item())
+                self.counters['validation_it'] += 1
 
             self.losses['train'][self.counters['epoch']] = np.mean(e_train_losses)
             self.losses['validation'][self.counters['epoch']] = np.mean(e_validation_losses)
@@ -89,44 +88,21 @@ class Skeleton:
             self._save_checkpoint()
             self._apply_early_stopping()
 
+    def _step_train(self, it_data: any, it_target: any):
+        raise NotImplementedError
+
+    def _step_validation(self, it_data: any, it_target: any):
+        raise NotImplementedError
+
     def test(self):
-
-        for test_epoch in self.losses['train'].keys():
-            print(test_epoch)
-        exit()
-
         test_losses = []
         for it_data, it_target in self.test_loader:
-            with torch.no_grad():
-                it_prediction = self.model(it_data.float())
             it_loss = torch.nn.functional.l1_loss(it_prediction, it_target.float())
             test_losses.append(it_loss.item())
-
         self.logger.info('Average Test Loss: {}'.format(np.mean(test_losses)))
 
-    def _init_datasets(self):
-        self.train_dataset = SkeletonDataset(self.experiment.data, split='train')
-        self.validation_dataset = SkeletonDataset(self.experiment.data, split='validation')
-        self.test_dataset = SkeletonDataset(self.experiment.data, split='test')
-
-    def _init_loaders(self):
-        self.train_loader = torch.utils.data.DataLoader(
-            self.train_dataset, batch_size=self.experiment.conf.get('training', 'batch_size'))
-        self.validation_loader = torch.utils.data.DataLoader(
-            self.validation_dataset, batch_size=self.experiment.conf.get('training', 'batch_size'))
-        self.test_loader = torch.utils.data.DataLoader(
-            self.test_dataset, batch_size=self.experiment.conf.get('training', 'batch_size'))
-
-    def _init_model(self):
-        self.model = SkeletonModel(self.experiment.conf.get('model', 'use_bias'))
-
-    def _init_optimizer(self):
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.experiment.conf.get('training', 'lr'))
-
-    def _init_lr_scheduler(self):
-        self.lr_scheduler = None
-        if self.experiment.conf.get('training', 'lr_decay_strategy') == 'plateau':
-            self.lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, patience=1)
+    def _step_test(self, it_data: any, it_target: any):
+        pass
 
     def _apply_lr_decay(self):
         if self.lr_scheduler:

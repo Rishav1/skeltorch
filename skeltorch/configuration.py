@@ -3,7 +3,7 @@ import jsonschema
 import pickle
 
 
-class SkeletonConfiguration:
+class Configuration:
     """Class to handle project configuration parameters.
 
     Configuration parameters given in `config.json` are stored as class attributes dynamically. Configuration
@@ -20,16 +20,6 @@ class SkeletonConfiguration:
     Other configuration categories may be included, depending on the specific task. Remember to declare the category
     in the class attributes so the `set()` method does not raises an exception.
     """
-    data: dict
-    split: dict
-    model: dict
-    training: dict
-
-    def __init__(self):
-        self.data = {}
-        self.split = {}
-        self.model = {}
-        self.training = {}
 
     def create(self, config_file_path: str, config_schema_path: str):
         """Loads and validates configuration file with schema validation.
@@ -50,10 +40,9 @@ class SkeletonConfiguration:
                 schema_content = json.load(schema_file)
                 jsonschema.validate(config_content, schema_content)
             for config_cat, config_cat_items in config_content.items():
+                setattr(self, config_cat, dict())
                 for config_param, config_value in config_cat_items.items():
                     self.set(config_cat, config_param, config_value)
-        self._init_default_parameters()
-        self._init_computed_parameters()
 
     def save(self, config_file_path: str):
         """Saves the configuration object attributes inside the experiment.
@@ -65,10 +54,8 @@ class SkeletonConfiguration:
         """
         with open(config_file_path, 'wb') as config_file:
             config = dict()
-            config['data'] = self.data
-            config['split'] = self.split
-            config['model'] = self.model
-            config['training'] = self.training
+            for attr, value in self.__dict__.items():
+                config[attr] = value
             pickle.dump(config, config_file)
 
     def load(self, config_file_path: str):
@@ -81,10 +68,8 @@ class SkeletonConfiguration:
         """
         with open(config_file_path, 'rb') as config_file:
             config = pickle.load(config_file)
-            self.data = config['data']
-            self.split = config['split']
-            self.model = config['model']
-            self.training = config['training']
+            for attr, value in config.items():
+                setattr(self, attr, value)
 
     def get(self, config_cat: str, config_param: str):
         """Gets a dynamically-loaded attribute.
@@ -99,7 +84,10 @@ class SkeletonConfiguration:
         Return:
             config_value (any): retrieved configuration value.
         """
-        return getattr(self, config_cat)[config_param]
+        try:
+            return getattr(self, config_cat)[config_param]
+        except KeyError:
+            return None
 
     def set(self, config_cat: str, config_param: str, config_value: any):
         """Sets a dynamically-loaded attribute.
@@ -113,27 +101,3 @@ class SkeletonConfiguration:
             config_value (any): configuration value to set.
         """
         getattr(self, config_cat)[config_param] = config_value
-
-    def _init_default_parameters(self):
-        """Initializes optional configuration parameters.
-
-        Initializes all those configuration parameters which are not strictly relevant and can have a default value.
-        Only initialized if no other value has explicitly been set in the configuration file.
-        """
-        if 'early_stopping_no_reduction_epochs' not in self.training:
-            self.set('training', 'early_stopping_no_reduction_epochs', 10)
-        if 'early_stopping_no_reduction_tolerance' not in self.training:
-            self.set('training', 'early_stopping_no_reduction_tolerance', 0.01)
-
-    def _init_computed_parameters(self):
-        """Initializes computed configuration parameters.
-
-        Used to remove redundant parameters that depend on other lower-level configuration parameters. Stores inside
-        the configuration object in order to have direct access from other parts of the project.
-        """
-        self.set('data', 'test_samples', self.get('data', 'total_samples') *
-                 self.get('split', 'test_percentage') // 100)
-        self.set('data', 'validation_samples', self.get('data', 'total_samples') *
-                 self.get('split', 'validation_percentage') // 100)
-        self.set('data', 'train_samples', self.get('data', 'total_samples') - self.get('data', 'test_samples') -
-                 self.get('data', 'validation_samples'))
